@@ -1,0 +1,1023 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>congrabbit — 影音剪輯</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;1,300;1,400&family=Noto+Sans+TC:wght@300;400&family=Courier+Prime&display=swap" rel="stylesheet">
+<style>
+  *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+  :root {
+    --black: #0a0a0a;
+    --dark: #111111;
+    --surface: #1a1a1a;
+    --border: #2a2a2a;
+    --dim: #444444;
+    --muted: #888888;
+    --light: #cccccc;
+    --white: #f0ede8;
+    --accent: #c8b89a;
+    --accent-dim: rgba(200,184,154,0.15);
+  }
+
+  html { scroll-behavior: smooth; }
+
+  body {
+    font-family: 'Noto Sans TC', sans-serif;
+    background: var(--black);
+    color: var(--light);
+    font-weight: 300;
+    font-size: 14px;
+    line-height: 1.8;
+    cursor: crosshair;
+    overflow-x: hidden;
+  }
+
+  /* ── CURSOR ── */
+  .cursor-dot {
+    width: 5px; height: 5px;
+    background: var(--accent);
+    border-radius: 50%;
+    position: fixed;
+    pointer-events: none;
+    z-index: 9999;
+    transform: translate(-50%, -50%);
+  }
+  .cursor-ring {
+    width: 28px; height: 28px;
+    border: 1px solid rgba(200,184,154,0.4);
+    border-radius: 50%;
+    position: fixed;
+    pointer-events: none;
+    z-index: 9998;
+    transform: translate(-50%, -50%);
+    transition: border-color 0.3s, transform 0.3s;
+  }
+
+  /* ── NAV ── */
+  nav {
+    position: fixed;
+    top: 0; left: 0; right: 0;
+    z-index: 100;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 28px 60px;
+    background: linear-gradient(to bottom, rgba(10,10,10,0.97) 0%, transparent 100%);
+  }
+
+  .nav-logo {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: 20px;
+    font-weight: 300;
+    font-style: italic;
+    color: var(--white);
+    letter-spacing: 0.04em;
+    text-decoration: none;
+  }
+
+  .nav-logo span {
+    color: var(--accent);
+  }
+
+  .nav-links {
+    display: flex;
+    gap: 40px;
+    list-style: none;
+  }
+
+  .nav-links a {
+    font-family: 'Courier Prime', monospace;
+    font-size: 11px;
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+    color: var(--muted);
+    text-decoration: none;
+    transition: color 0.3s;
+  }
+
+  .nav-links a:hover { color: var(--white); }
+
+  /* ── HERO ── */
+  .hero {
+    height: 100vh;
+    display: flex;
+    align-items: flex-end;
+    padding: 0 60px 90px;
+    position: relative;
+    overflow: hidden;
+    background: var(--black);
+  }
+
+  /* Animated timeline-like background */
+  .hero-bg {
+    position: absolute;
+    inset: 0;
+    overflow: hidden;
+    opacity: 0.18;
+  }
+
+  .timeline-track {
+    position: absolute;
+    height: 2px;
+    background: var(--accent);
+    border-radius: 1px;
+    animation: trackPlay linear infinite;
+  }
+
+  .timeline-track:nth-child(1)  { top: 22%; width: 60%; left: 5%;  animation-duration: 8s;  opacity: 0.9; }
+  .timeline-track:nth-child(2)  { top: 30%; width: 35%; left: 30%; animation-duration: 11s; opacity: 0.6; animation-delay: -3s; }
+  .timeline-track:nth-child(3)  { top: 38%; width: 80%; left: 2%;  animation-duration: 14s; opacity: 0.4; animation-delay: -6s; }
+  .timeline-track:nth-child(4)  { top: 46%; width: 45%; left: 20%; animation-duration: 9s;  opacity: 0.7; animation-delay: -1s; }
+  .timeline-track:nth-child(5)  { top: 54%; width: 70%; left: 0%;  animation-duration: 12s; opacity: 0.5; animation-delay: -4s; }
+  .timeline-track:nth-child(6)  { top: 62%; width: 30%; left: 50%; animation-duration: 7s;  opacity: 0.8; animation-delay: -2s; }
+  .timeline-track:nth-child(7)  { top: 70%; width: 55%; left: 10%; animation-duration: 10s; opacity: 0.5; animation-delay: -5s; }
+
+  @keyframes trackPlay {
+    0%   { transform: scaleX(0); transform-origin: left; }
+    45%  { transform: scaleX(1); transform-origin: left; }
+    50%  { transform: scaleX(1); transform-origin: right; }
+    95%  { transform: scaleX(0); transform-origin: right; }
+    100% { transform: scaleX(0); transform-origin: left; }
+  }
+
+  /* vertical clip markers */
+  .clip-marker {
+    position: absolute;
+    width: 1px;
+    background: var(--accent);
+    opacity: 0.25;
+    animation: markerBlink 3s ease-in-out infinite;
+  }
+
+  .clip-marker:nth-child(8)  { left: 15%; top: 15%; height: 70%; animation-delay: 0s; }
+  .clip-marker:nth-child(9)  { left: 35%; top: 20%; height: 55%; animation-delay: 1s; }
+  .clip-marker:nth-child(10) { left: 58%; top: 10%; height: 80%; animation-delay: 0.5s; }
+  .clip-marker:nth-child(11) { left: 78%; top: 25%; height: 50%; animation-delay: 1.5s; }
+
+  @keyframes markerBlink {
+    0%, 100% { opacity: 0.1; }
+    50% { opacity: 0.35; }
+  }
+
+  .hero-content {
+    position: relative;
+    z-index: 2;
+    animation: fadeUp 1.2s ease-out 0.3s both;
+  }
+
+  @keyframes fadeUp {
+    from { opacity: 0; transform: translateY(30px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+
+  .hero-eyebrow {
+    font-family: 'Courier Prime', monospace;
+    font-size: 11px;
+    letter-spacing: 0.28em;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin-bottom: 22px;
+  }
+
+  .hero-name {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: clamp(56px, 9vw, 110px);
+    font-weight: 300;
+    line-height: 0.88;
+    color: var(--white);
+    letter-spacing: -0.02em;
+    margin-bottom: 32px;
+  }
+
+  .hero-name em {
+    font-style: italic;
+    color: var(--accent);
+  }
+
+  .hero-tagline {
+    font-size: 14px;
+    color: var(--muted);
+    letter-spacing: 0.04em;
+    max-width: 360px;
+    border-left: 1px solid var(--dim);
+    padding-left: 20px;
+    line-height: 1.7;
+  }
+
+  .hero-scroll {
+    position: absolute;
+    right: 60px;
+    bottom: 90px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 14px;
+    color: var(--dim);
+    font-family: 'Courier Prime', monospace;
+    font-size: 10px;
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+    writing-mode: vertical-rl;
+  }
+
+  .scroll-line {
+    width: 1px; height: 64px;
+    background: var(--dim);
+    animation: scrollPulse 2.2s ease-in-out infinite;
+  }
+
+  @keyframes scrollPulse {
+    0%, 100% { opacity: 0.3; transform: scaleY(1); }
+    50%       { opacity: 1;   transform: scaleY(0.55); }
+  }
+
+  /* ── SECTION UTILITY ── */
+  .section-label {
+    font-family: 'Courier Prime', monospace;
+    font-size: 10px;
+    letter-spacing: 0.32em;
+    text-transform: uppercase;
+    color: var(--dim);
+    margin-bottom: 56px;
+    display: flex;
+    align-items: center;
+    gap: 20px;
+  }
+
+  .section-label::after {
+    content: '';
+    flex: 0 0 72px;
+    height: 1px;
+    background: var(--border);
+  }
+
+  /* ── WORKS ── */
+  #works {
+    background: var(--dark);
+    padding: 120px 60px;
+  }
+
+  .works-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-end;
+    margin-bottom: 60px;
+  }
+
+  .works-title {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: 52px;
+    font-weight: 300;
+    color: var(--white);
+    line-height: 1;
+  }
+
+  .works-filter {
+    display: flex;
+    gap: 0;
+    border: 1px solid var(--border);
+  }
+
+  .filter-btn {
+    font-family: 'Courier Prime', monospace;
+    font-size: 11px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--dim);
+    background: transparent;
+    border: none;
+    padding: 10px 22px;
+    cursor: pointer;
+    transition: all 0.25s;
+    border-right: 1px solid var(--border);
+  }
+
+  .filter-btn:last-child { border-right: none; }
+
+  .filter-btn:hover,
+  .filter-btn.active {
+    color: var(--black);
+    background: var(--accent);
+  }
+
+  /* Works grid: 2-column layout */
+  .works-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 3px;
+  }
+
+  .work-card {
+    position: relative;
+    overflow: hidden;
+    background: var(--surface);
+    cursor: pointer;
+    display: none;
+  }
+
+  .work-card.visible { display: block; }
+
+  .work-thumb {
+    width: 100%;
+    padding-bottom: 56.25%; /* 16:9 */
+    position: relative;
+    overflow: hidden;
+  }
+
+  .work-img {
+    position: absolute;
+    inset: 0;
+    transition: transform 0.7s cubic-bezier(0.25,0.46,0.45,0.94);
+  }
+
+  .work-card:hover .work-img { transform: scale(1.04); }
+
+  /* Simulated thumbnail look */
+  .work-img-yt1 { background: radial-gradient(ellipse at 40% 50%, #252525 0%, #0e0e0e 65%); }
+  .work-img-yt2 { background: radial-gradient(ellipse at 70% 30%, #1e1e1e 0%, #0c0c0c 65%); }
+  .work-img-yt3 { background: radial-gradient(ellipse at 30% 70%, #222 0%, #101010 65%); }
+  .work-img-yt4 { background: radial-gradient(ellipse at 60% 40%, #1a1a1a 0%, #0a0a0a 65%); }
+  .work-img-sh1 { background: radial-gradient(ellipse at 50% 30%, #202020 0%, #0d0d0d 65%); }
+  .work-img-sh2 { background: radial-gradient(ellipse at 35% 65%, #1c1c1c 0%, #0b0b0b 65%); }
+
+  /* Play button overlay */
+  .work-play {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    opacity: 0;
+    transition: opacity 0.35s;
+  }
+
+  .work-card:hover .work-play { opacity: 1; }
+
+  .play-icon {
+    width: 52px; height: 52px;
+    border: 1px solid rgba(200,184,154,0.7);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .play-tri {
+    width: 0; height: 0;
+    border-style: solid;
+    border-width: 8px 0 8px 14px;
+    border-color: transparent transparent transparent var(--accent);
+    margin-left: 3px;
+  }
+
+  .work-info {
+    padding: 20px 22px 24px;
+  }
+
+  .work-tag {
+    font-family: 'Courier Prime', monospace;
+    font-size: 10px;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin-bottom: 8px;
+  }
+
+  .work-name {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: 20px;
+    font-weight: 300;
+    color: var(--white);
+    margin-bottom: 6px;
+  }
+
+  .work-desc {
+    font-size: 12px;
+    color: var(--muted);
+    line-height: 1.6;
+  }
+
+  /* ── ABOUT ── */
+  #about {
+    padding: 120px 60px;
+    background: var(--black);
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 80px;
+    align-items: start;
+  }
+
+  .about-portrait {
+    position: sticky;
+    top: 120px;
+    aspect-ratio: 3/4;
+    background: radial-gradient(ellipse at 42% 35%, #1e1e1e 0%, #0d0d0d 70%);
+    overflow: hidden;
+  }
+
+  .portrait-corner {
+    position: absolute;
+    width: 22px; height: 22px;
+    border-color: var(--accent);
+    border-style: solid;
+    opacity: 0.55;
+  }
+
+  .portrait-corner.tl { top: 18px; left: 18px;  border-width: 1px 0 0 1px; }
+  .portrait-corner.tr { top: 18px; right: 18px;  border-width: 1px 1px 0 0; }
+  .portrait-corner.bl { bottom: 18px; left: 18px;  border-width: 0 0 1px 1px; }
+  .portrait-corner.br { bottom: 18px; right: 18px; border-width: 0 1px 1px 0; }
+
+  /* "Photo" label */
+  .portrait-label {
+    position: absolute;
+    bottom: 22px; left: 50%;
+    transform: translateX(-50%);
+    font-family: 'Courier Prime', monospace;
+    font-size: 10px;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: var(--dim);
+    white-space: nowrap;
+  }
+
+  .about-text { padding-top: 40px; }
+
+  .about-name {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: 52px;
+    font-weight: 300;
+    line-height: 0.95;
+    color: var(--white);
+    margin-bottom: 10px;
+  }
+
+  .about-role {
+    font-family: 'Courier Prime', monospace;
+    font-size: 11px;
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin-bottom: 36px;
+  }
+
+  .about-bio {
+    color: var(--muted);
+    font-size: 14px;
+    line-height: 1.95;
+    margin-bottom: 52px;
+  }
+
+  .about-bio p + p { margin-top: 18px; }
+
+  .about-stats {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 0;
+    border-top: 1px solid var(--border);
+    border-left: 1px solid var(--border);
+  }
+
+  .stat {
+    padding: 28px 24px;
+    border-right: 1px solid var(--border);
+    border-bottom: 1px solid var(--border);
+  }
+
+  .stat-num {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: 40px;
+    font-weight: 300;
+    color: var(--white);
+    line-height: 1;
+    margin-bottom: 8px;
+  }
+
+  .stat-label {
+    font-family: 'Courier Prime', monospace;
+    font-size: 10px;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: var(--dim);
+  }
+
+  /* ── SKILLS ── */
+  #skills {
+    padding: 120px 60px;
+    background: var(--dark);
+  }
+
+  .skills-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 1px;
+    background: var(--border);
+  }
+
+  .skill-block {
+    background: var(--dark);
+    padding: 44px 36px;
+    transition: background 0.3s;
+  }
+
+  .skill-block:hover { background: var(--surface); }
+
+  .skill-icon {
+    font-family: 'Courier Prime', monospace;
+    font-size: 18px;
+    color: var(--accent);
+    margin-bottom: 22px;
+    line-height: 1;
+    letter-spacing: 0.05em;
+  }
+
+  .skill-name {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: 24px;
+    font-weight: 300;
+    color: var(--white);
+    margin-bottom: 12px;
+  }
+
+  .skill-desc {
+    font-size: 13px;
+    color: var(--muted);
+    line-height: 1.75;
+    margin-bottom: 22px;
+  }
+
+  .skill-tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  .skill-tag {
+    font-family: 'Courier Prime', monospace;
+    font-size: 10px;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    color: var(--dim);
+    border: 1px solid var(--border);
+    padding: 4px 10px;
+    transition: all 0.25s;
+  }
+
+  .skill-block:hover .skill-tag {
+    border-color: var(--dim);
+    color: var(--muted);
+  }
+
+  /* ── CONTACT ── */
+  #contact {
+    padding: 140px 60px;
+    background: var(--black);
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 80px;
+    align-items: center;
+  }
+
+  .contact-left h2 {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: clamp(44px, 5.5vw, 78px);
+    font-weight: 300;
+    line-height: 0.95;
+    color: var(--white);
+    margin-bottom: 32px;
+  }
+
+  .contact-left h2 em {
+    font-style: italic;
+    color: var(--accent);
+  }
+
+  .contact-left p {
+    font-size: 14px;
+    color: var(--muted);
+    line-height: 1.8;
+    max-width: 360px;
+  }
+
+  .contact-right {
+    display: flex;
+    flex-direction: column;
+    gap: 24px;
+  }
+
+  .contact-item {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    padding: 28px 0;
+    border-bottom: 1px solid var(--border);
+    text-decoration: none;
+  }
+
+  .contact-item:first-child { border-top: 1px solid var(--border); }
+
+  .contact-type {
+    font-family: 'Courier Prime', monospace;
+    font-size: 10px;
+    letter-spacing: 0.25em;
+    text-transform: uppercase;
+    color: var(--dim);
+  }
+
+  .contact-value {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: 22px;
+    font-weight: 300;
+    font-style: italic;
+    color: var(--accent);
+    transition: color 0.3s;
+    text-decoration: none;
+  }
+
+  .contact-item:hover .contact-value { color: var(--white); }
+
+  /* ── FOOTER ── */
+  footer {
+    border-top: 1px solid var(--border);
+    padding: 28px 60px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background: var(--black);
+  }
+
+  .footer-logo {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: 16px;
+    font-style: italic;
+    color: var(--dim);
+    font-weight: 300;
+  }
+
+  .footer-copy {
+    font-family: 'Courier Prime', monospace;
+    font-size: 10px;
+    letter-spacing: 0.15em;
+    color: var(--dim);
+  }
+
+  /* ── REVEAL ANIMATION ── */
+  .reveal {
+    opacity: 0;
+    transform: translateY(22px);
+    transition: opacity 0.7s ease, transform 0.7s ease;
+  }
+
+  .reveal.in-view {
+    opacity: 1;
+    transform: translateY(0);
+  }
+
+  /* ── RESPONSIVE (basic) ── */
+  @media (max-width: 768px) {
+    nav { padding: 22px 24px; }
+    .nav-links { gap: 20px; }
+    .hero { padding: 0 24px 60px; }
+    #works, #skills, #contact, footer { padding-left: 24px; padding-right: 24px; }
+    #about { grid-template-columns: 1fr; padding: 80px 24px; }
+    .about-portrait { display: none; }
+    .works-grid { grid-template-columns: 1fr; }
+    .skills-grid { grid-template-columns: 1fr; }
+    #contact { grid-template-columns: 1fr; }
+    .about-stats { grid-template-columns: repeat(3, 1fr); }
+  }
+</style>
+</head>
+<body>
+
+<div class="cursor-dot" id="dot"></div>
+<div class="cursor-ring" id="ring"></div>
+
+<!-- NAV -->
+<nav>
+  <a href="#" class="nav-logo">con<span>grab</span>bit</a>
+  <ul class="nav-links">
+    <li><a href="#works">Works</a></li>
+    <li><a href="#about">About</a></li>
+    <li><a href="#skills">Skills</a></li>
+    <li><a href="#contact">Contact</a></li>
+  </ul>
+</nav>
+
+<!-- HERO -->
+<div class="hero" id="home">
+  <div class="hero-bg">
+    <div class="timeline-track"></div>
+    <div class="timeline-track"></div>
+    <div class="timeline-track"></div>
+    <div class="timeline-track"></div>
+    <div class="timeline-track"></div>
+    <div class="timeline-track"></div>
+    <div class="timeline-track"></div>
+    <div class="clip-marker"></div>
+    <div class="clip-marker"></div>
+    <div class="clip-marker"></div>
+    <div class="clip-marker"></div>
+  </div>
+  <div class="hero-content">
+    <p class="hero-eyebrow">Video Editor &nbsp;/&nbsp; YouTube Specialist</p>
+    <h1 class="hero-name">con<em>grab</em>bit</h1>
+    <p class="hero-tagline">專職 YouTube 影片剪輯，7 年以上。<br>節奏、音樂與畫面，讓每支影片<br>更有黏著度。</p>
+  </div>
+  <div class="hero-scroll">
+    <div class="scroll-line"></div>
+    scroll
+  </div>
+</div>
+
+<!-- WORKS -->
+<section id="works">
+  <div class="section-label">01 — Portfolio</div>
+  <div class="works-header">
+    <h2 class="works-title">Selected<br>Works</h2>
+    <div class="works-filter">
+      <button class="filter-btn active" data-filter="all">All</button>
+      <button class="filter-btn" data-filter="yt">YouTube</button>
+      <button class="filter-btn" data-filter="short">Shorts</button>
+    </div>
+  </div>
+  <div class="works-grid">
+
+    <div class="work-card visible" data-cat="yt">
+      <div class="work-thumb">
+        <div class="work-img work-img-yt1"></div>
+        <div class="work-play"><div class="play-icon"><div class="play-tri"></div></div></div>
+      </div>
+      <div class="work-info">
+        <p class="work-tag">YouTube · Vlog</p>
+        <p class="work-name">日常 Vlog 剪輯</p>
+        <p class="work-desc">生活感節奏剪輯，運用音樂律動與畫面轉場，打造輕鬆的觀看體驗。</p>
+      </div>
+    </div>
+
+    <div class="work-card visible" data-cat="yt">
+      <div class="work-thumb">
+        <div class="work-img work-img-yt2"></div>
+        <div class="work-play"><div class="play-icon"><div class="play-tri"></div></div></div>
+      </div>
+      <div class="work-info">
+        <p class="work-tag">YouTube · 知識型</p>
+        <p class="work-name">知識型內容剪輯</p>
+        <p class="work-desc">以清晰的敘事結構引導觀眾，搭配字卡動態與重點節奏強化訊息傳遞。</p>
+      </div>
+    </div>
+
+    <div class="work-card visible" data-cat="yt">
+      <div class="work-thumb">
+        <div class="work-img work-img-yt3"></div>
+        <div class="work-play"><div class="play-icon"><div class="play-tri"></div></div></div>
+      </div>
+      <div class="work-info">
+        <p class="work-tag">YouTube · 機構宣傳</p>
+        <p class="work-name">品牌宣傳影片</p>
+        <p class="work-desc">機構與品牌形象影片剪輯，從素材梳理到整體節奏規劃，完整交件流程。</p>
+      </div>
+    </div>
+
+    <div class="work-card visible" data-cat="yt">
+      <div class="work-thumb">
+        <div class="work-img work-img-yt4"></div>
+        <div class="work-play"><div class="play-icon"><div class="play-tri"></div></div></div>
+      </div>
+      <div class="work-info">
+        <p class="work-tag">YouTube · 長片</p>
+        <p class="work-name">長片剪輯 / 訪談節目</p>
+        <p class="work-desc">訪談、紀錄型長片，精準保留核心訊息，節奏掌控讓長片不沉悶。</p>
+      </div>
+    </div>
+
+    <div class="work-card visible" data-cat="short">
+      <div class="work-thumb">
+        <div class="work-img work-img-sh1"></div>
+        <div class="work-play"><div class="play-icon"><div class="play-tri"></div></div></div>
+      </div>
+      <div class="work-info">
+        <p class="work-tag">Shorts · 轉場設計</p>
+        <p class="work-name">短影音轉場剪輯</p>
+        <p class="work-desc">節奏快、抓眼球，從長片素材截取精華轉化為高互動短影音內容。</p>
+      </div>
+    </div>
+
+    <div class="work-card visible" data-cat="short">
+      <div class="work-thumb">
+        <div class="work-img work-img-sh2"></div>
+        <div class="work-play"><div class="play-icon"><div class="play-tri"></div></div></div>
+      </div>
+      <div class="work-info">
+        <p class="work-tag">Shorts · Reels</p>
+        <p class="work-name">跨平台短影音</p>
+        <p class="work-desc">YouTube Shorts / IG Reels / TikTok 格式適配，快速節奏搭配字幕設計。</p>
+      </div>
+    </div>
+
+  </div>
+</section>
+
+<!-- ABOUT -->
+<section id="about" style="display:grid;grid-template-columns:1fr 1fr;gap:80px;align-items:start;padding:120px 60px;background:var(--black);">
+  <div class="about-portrait">
+    <div class="portrait-corner tl"></div>
+    <div class="portrait-corner tr"></div>
+    <div class="portrait-corner bl"></div>
+    <div class="portrait-corner br"></div>
+    <div class="portrait-label">congrabbit</div>
+  </div>
+  <div class="about-text">
+    <div class="section-label">02 — About</div>
+    <h2 class="about-name">congrabbit</h2>
+    <p class="about-role">Video Editor · YouTube Specialist</p>
+    <div class="about-bio">
+      <p>我是影音剪輯工作者，專職剪輯 YouTube 影片已超過 7 年，熟悉各種頻道風格與平台節奏，從日常 Vlog、知識型內容、機構宣傳到短影音轉場設計皆有經驗。</p>
+      <p>我擅長以觀眾角度出發，理解影片核心並運用節奏、音樂與畫面設計提升觀看體驗，讓內容更有黏著度。與多位創作者長期合作，具備完整的剪輯工作流程與溝通習慣，能有效處理素材以及客戶需求並快速交件。</p>
+    </div>
+    <div class="about-stats">
+      <div class="stat reveal">
+        <div class="stat-num">7+</div>
+        <div class="stat-label">Years Exp.</div>
+      </div>
+      <div class="stat reveal">
+        <div class="stat-num">500+</div>
+        <div class="stat-label">Videos</div>
+      </div>
+      <div class="stat reveal">
+        <div class="stat-num">30+</div>
+        <div class="stat-label">Channels</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- SKILLS -->
+<section id="skills">
+  <div class="section-label">03 — Specialties</div>
+  <div class="skills-grid">
+
+    <div class="skill-block reveal">
+      <div class="skill-icon">[ ▶▶ ]</div>
+      <div class="skill-name">YouTube 長片剪輯</div>
+      <p class="skill-desc">Vlog、知識型、訪談與宣傳影片全類型，熟悉各種頻道風格與平台演算邏輯。</p>
+      <div class="skill-tags">
+        <span class="skill-tag">Vlog</span>
+        <span class="skill-tag">Knowledge</span>
+        <span class="skill-tag">PR Film</span>
+      </div>
+    </div>
+
+    <div class="skill-block reveal">
+      <div class="skill-icon">[ ↕ ]</div>
+      <div class="skill-name">短影音剪輯</div>
+      <p class="skill-desc">YouTube Shorts、IG Reels、TikTok 格式適配，節奏快速精準，掌握平台留人機制。</p>
+      <div class="skill-tags">
+        <span class="skill-tag">Shorts</span>
+        <span class="skill-tag">Reels</span>
+        <span class="skill-tag">TikTok</span>
+      </div>
+    </div>
+
+    <div class="skill-block reveal">
+      <div class="skill-icon">[ ♫ ]</div>
+      <div class="skill-name">節奏與音樂設計</div>
+      <p class="skill-desc">以音樂律動驅動剪輯節奏，搭配音效設計讓畫面更有力道，情緒轉折更精準。</p>
+      <div class="skill-tags">
+        <span class="skill-tag">Rhythm Edit</span>
+        <span class="skill-tag">SFX</span>
+      </div>
+    </div>
+
+    <div class="skill-block reveal">
+      <div class="skill-icon">[ T_ ]</div>
+      <div class="skill-name">字幕與字卡動態</div>
+      <p class="skill-desc">中英文字幕製作、動態字卡設計，提升資訊可讀性與畫面質感，強化觀看體驗。</p>
+      <div class="skill-tags">
+        <span class="skill-tag">Subtitle</span>
+        <span class="skill-tag">Motion Text</span>
+      </div>
+    </div>
+
+    <div class="skill-block reveal">
+      <div class="skill-icon">[ ◈ ]</div>
+      <div class="skill-name">轉場設計</div>
+      <p class="skill-desc">流暢自然或衝擊感強的轉場設計，配合頻道風格量身規劃，不過度套用模板。</p>
+      <div class="skill-tags">
+        <span class="skill-tag">Transition</span>
+        <span class="skill-tag">Cut Design</span>
+      </div>
+    </div>
+
+    <div class="skill-block reveal">
+      <div class="skill-icon">[ ⚙ ]</div>
+      <div class="skill-name">完整工作流程</div>
+      <p class="skill-desc">從素材整理、粗剪、精剪到輸出交件，流程清晰有效率，溝通明確可快速交件。</p>
+      <div class="skill-tags">
+        <span class="skill-tag">Premiere Pro</span>
+        <span class="skill-tag">DaVinci</span>
+        <span class="skill-tag">After Effects</span>
+      </div>
+    </div>
+
+  </div>
+</section>
+
+<!-- CONTACT -->
+<section id="contact">
+  <div class="contact-left">
+    <div class="section-label">04 — Contact</div>
+    <h2>一起讓<br>影片更<em>有力</em></h2>
+    <p>有合作想法、報價詢問或長期配合計畫，歡迎來信聊聊。</p>
+  </div>
+  <div class="contact-right">
+    <a href="mailto:hocongrabbit@gmail.com" class="contact-item">
+      <span class="contact-type">Email</span>
+      <span class="contact-value">hocongrabbit@gmail.com</span>
+    </a>
+    <a href="#" class="contact-item">
+      <span class="contact-type">YouTube</span>
+      <span class="contact-value">congrabbit</span>
+    </a>
+    <a href="#" class="contact-item">
+      <span class="contact-type">Instagram</span>
+      <span class="contact-value">@congrabbit</span>
+    </a>
+  </div>
+</section>
+
+<footer>
+  <div class="footer-logo">congrabbit</div>
+  <div class="footer-copy">&copy; 2025 congrabbit — All Rights Reserved</div>
+</footer>
+
+<script>
+  /* ── Custom cursor ── */
+  const dot  = document.getElementById('dot');
+  const ring = document.getElementById('ring');
+  let mx = 0, my = 0, rx = 0, ry = 0;
+
+  document.addEventListener('mousemove', e => {
+    mx = e.clientX; my = e.clientY;
+    dot.style.left = mx + 'px';
+    dot.style.top  = my + 'px';
+  });
+
+  (function animateRing() {
+    rx += (mx - rx) * 0.16;
+    ry += (my - ry) * 0.16;
+    ring.style.left = rx + 'px';
+    ring.style.top  = ry + 'px';
+    requestAnimationFrame(animateRing);
+  })();
+
+  document.querySelectorAll('a, button, .work-card, .skill-block').forEach(el => {
+    el.addEventListener('mouseenter', () => {
+      ring.style.transform = 'translate(-50%, -50%) scale(1.7)';
+      ring.style.borderColor = 'rgba(200,184,154,0.85)';
+    });
+    el.addEventListener('mouseleave', () => {
+      ring.style.transform = 'translate(-50%, -50%) scale(1)';
+      ring.style.borderColor = 'rgba(200,184,154,0.4)';
+    });
+  });
+
+  /* ── Works filter ── */
+  const filterBtns = document.querySelectorAll('.filter-btn');
+  const workCards  = document.querySelectorAll('.work-card');
+
+  filterBtns.forEach(btn => {
+    btn.addEventListener('click', () => {
+      filterBtns.forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      const f = btn.dataset.filter;
+      workCards.forEach(card => {
+        if (f === 'all' || card.dataset.cat === f) {
+          card.classList.add('visible');
+        } else {
+          card.classList.remove('visible');
+        }
+      });
+    });
+  });
+
+  /* ── Scroll reveal ── */
+  const observer = new IntersectionObserver(entries => {
+    entries.forEach(e => {
+      if (e.isIntersecting) {
+        e.target.classList.add('in-view');
+        observer.unobserve(e.target);
+      }
+    });
+  }, { threshold: 0.12 });
+
+  document.querySelectorAll('.reveal, .work-card, .skill-block').forEach((el, i) => {
+    el.style.transitionDelay = (i % 3) * 0.1 + 's';
+    observer.observe(el);
+  });
+</script>
+</body>
+</html>
